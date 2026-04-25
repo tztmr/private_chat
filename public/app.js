@@ -20,6 +20,7 @@ const elements = {
   nicknameInput: document.getElementById("nicknameInput"),
   updateNicknameButton: document.getElementById("updateNicknameButton"),
   roomCard: document.getElementById("roomCard"),
+  passwordInput: document.getElementById("passwordInput"),
   roomInput: document.getElementById("roomInput"),
   createRoomButton: document.getElementById("createRoomButton"),
   joinRoomButton: document.getElementById("joinRoomButton"),
@@ -273,12 +274,19 @@ function joinRoom(roomId) {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
     .slice(0, 8);
+  const password = elements.passwordInput.value.trim();
+
+  if (!password) {
+    appendMessage({ system: true, text: "请输入进入密码" });
+    return;
+  }
 
   elements.roomInput.value = normalizedRoomId;
   send({
     type: "join",
     roomId: normalizedRoomId,
     nickname: elements.nicknameInput.value.trim(),
+    password,
   });
 }
 

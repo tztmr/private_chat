@@ -8,6 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
+const ROOM_ACCESS_PASSWORD = process.env.ROOM_ACCESS_PASSWORD || "mxw888";
 const MAX_ROOM_USERS = 10;
 const MAX_TEXT_LENGTH = 1000;
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -209,6 +210,12 @@ wss.on("connection", (socket) => {
     }
 
     if (message.type === "join") {
+      const providedPassword = String(message.password || "").trim();
+      if (providedPassword !== ROOM_ACCESS_PASSWORD) {
+        send(socket, { type: "error", message: "密码错误，无法进入房间" });
+        return;
+      }
+
       if (currentRoomId && currentUserId) {
         const previousRoomId = currentRoomId;
         removeUserFromRoom(currentRoomId, currentUserId);
