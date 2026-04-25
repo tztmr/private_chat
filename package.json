@@ -1,0 +1,14 @@
+{
+  "name": "anonymous-chatroom",
+  "version": "1.0.0",
+  "description": "匿名聊天室，支持文字、图片、邀请链接和 10 人房间限制",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.20.0"
+  }
+}

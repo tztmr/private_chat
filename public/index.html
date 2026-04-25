@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>匿名聊天室</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <aside class="sidebar">
+        <div class="card">
+          <h1>匿名聊天室</h1>
+          <p class="muted">支持文字、图片、邀请链接，单房间最多 10 人。</p>
+        </div>
+
+        <div class="card">
+          <label for="nicknameInput">你的昵称</label>
+          <input id="nicknameInput" type="text" maxlength="20" placeholder="默认随机游客名" />
+          <div class="button-row">
+            <button id="updateNicknameButton" class="secondary" type="button">更新昵称</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <label for="roomInput">房间号</label>
+          <input id="roomInput" type="text" maxlength="8" placeholder="输入房间号或新建房间" />
+          <div class="button-row">
+            <button id="createRoomButton" type="button">新建房间</button>
+            <button id="joinRoomButton" class="secondary" type="button">进入房间</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="room-meta">
+            <span>当前房间</span>
+            <strong id="currentRoomLabel">未加入</strong>
+          </div>
+          <div class="invite-box">
+            <input id="inviteLinkInput" type="text" readonly placeholder="进入房间后生成邀请链接" />
+            <button id="copyInviteButton" class="secondary" type="button">复制链接</button>
+          </div>
+          <p class="muted" id="statusText">正在连接服务器...</p>
+        </div>
+
+        <div class="card">
+          <div class="online-header">
+            <span>在线成员</span>
+            <strong id="onlineCount">0 / 10</strong>
+          </div>
+          <ul id="userList" class="user-list"></ul>
+        </div>
+      </aside>
+
+      <main class="chat-panel">
+        <section id="messageList" class="message-list" aria-live="polite"></section>
+
+        <section class="composer">
+          <textarea
+            id="messageInput"
+            rows="3"
+            maxlength="1000"
+            placeholder="输入文字消息，按 Enter 发送，Shift + Enter 换行，也可直接粘贴图片"
+          ></textarea>
+          <p class="composer-tip">支持截图后直接在输入框粘贴图片，发送前会自动压缩。</p>
+          <div class="composer-actions">
+            <label class="file-button" for="imageInput">选择图片</label>
+            <input id="imageInput" type="file" accept="image/*" hidden />
+            <button id="sendButton" type="button">发送文字</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <div class="message-header">
+          <strong class="message-author"></strong>
+          <span class="message-time"></span>
+        </div>
+        <div class="message-body"></div>
+        <div class="message-actions">
+          <button class="message-recall-button" type="button">撤回</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
