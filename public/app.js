@@ -8,6 +8,9 @@ const state = {
   messages: new Map(),
 };
 
+const MAX_IMAGE_DATA_URL_LENGTH = 14_000_000;
+const MAX_RENDERED_MESSAGES = 200;
+
 const elements = {
   nicknameInput: document.getElementById("nicknameInput"),
   updateNicknameButton: document.getElementById("updateNicknameButton"),
@@ -77,9 +80,54 @@ function renderUsers(users) {
   });
 }
 
+function revokeNodeImageUrls(node) {
+  const imageObjectUrls = Array.isArray(node.imageObjectUrls) ? node.imageObjectUrls : [];
+  imageObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  node.imageObjectUrls = [];
+}
+
+function removeMessageNode(node) {
+  if (!node) {
+    return;
+  }
+
+  revokeNodeImageUrls(node);
+
+  const messageId = node.dataset.messageId;
+  if (messageId) {
+    state.messages.delete(messageId);
+  }
+
+  node.remove();
+}
+
+function trimRenderedMessages() {
+  while (elements.messageList.childElementCount > MAX_RENDERED_MESSAGES) {
+    removeMessageNode(elements.messageList.firstElementChild);
+  }
+}
+
 function clearMessages() {
+  Array.from(elements.messageList.children).forEach(removeMessageNode);
   state.messages.clear();
-  elements.messageList.innerHTML = "";
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, base64Data = ""] = String(dataUrl).split(",");
+  const mimeMatch = header.match(/^data:(.*?);base64$/);
+  const mimeType = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+
+  for (let index = 0; index < binaryString.length; index += 1) {
+    bytes[index] = binaryString.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
+function createImageObjectUrl(dataUrl) {
+  return URL.createObjectURL(dataUrlToBlob(dataUrl));
 }
 
 function appendMessage({
@@ -96,6 +144,7 @@ function appendMessage({
   const time = node.querySelector(".message-time");
   const body = node.querySelector(".message-body");
   const recallButton = node.querySelector(".message-recall-button");
+  node.imageObjectUrls = [];
 
   author.textContent = system ? "系统消息" : nickname;
   time.textContent = formatTime(timestamp || Date.now());
@@ -109,7 +158,9 @@ function appendMessage({
 
   if (imageDataUrl) {
     const image = document.createElement("img");
-    image.src = imageDataUrl;
+    const imageObjectUrl = createImageObjectUrl(imageDataUrl);
+    node.imageObjectUrls.push(imageObjectUrl);
+    image.src = imageObjectUrl;
     image.alt = "聊天图片";
     image.loading = "lazy";
     body.appendChild(image);
@@ -131,20 +182,24 @@ function appendMessage({
   }
 
   elements.messageList.appendChild(node);
+  trimRenderedMessages();
   elements.messageList.scrollTop = elements.messageList.scrollHeight;
 }
 
 function markMessageRecalled(messageId) {
-  const node = state.messages.get(messageId);
-  if (!node) {
+  const messageEntry = state.messages.get(messageId);
+  if (!messageEntry) {
     return;
   }
 
+  const node = messageEntry;
   const body = node.querySelector(".message-body");
   const recallButton = node.querySelector(".message-recall-button");
+  revokeNodeImageUrls(node);
   body.innerHTML = `<p>${escapeHtml("这条消息已被撤回")}</p>`;
   node.classList.add("recalled");
   recallButton.hidden = true;
+  state.messages.delete(messageId);
 }
 
 function send(payload) {
@@ -227,7 +282,7 @@ async function compressImage(file) {
 
   let quality = 0.9;
   let imageDataUrl = canvas.toDataURL("image/jpeg", quality);
-  while (imageDataUrl.length > 2_800_000 && quality > 0.45) {
+  while (imageDataUrl.length > MAX_IMAGE_DATA_URL_LENGTH && quality > 0.45) {
     quality -= 0.1;
     imageDataUrl = canvas.toDataURL("image/jpeg", quality);
   }
@@ -459,6 +514,18 @@ elements.messageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
     sendTextMessage();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  if (state.reconnectTimer) {
+    clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+  }
+
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
   }
 });
 

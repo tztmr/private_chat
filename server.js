@@ -10,20 +10,22 @@ const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 const MAX_ROOM_USERS = 10;
 const MAX_TEXT_LENGTH = 1000;
-const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_ROOM_MESSAGES = 100;
 const ROOM_ID_LENGTH = 8;
 const USER_ID_LENGTH = 10;
 const MESSAGE_ID_LENGTH = 12;
 const GUEST_NAME_LENGTH = 4;
+const HEARTBEAT_INTERVAL_MS = 30_000;
 const rooms = new Map();
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.use((req, res) => {
+app.use((_req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
@@ -66,6 +68,21 @@ function buildUserList(room) {
     userId: client.userId,
     nickname: client.nickname,
   }));
+}
+
+function trimRoomMessages(room) {
+  while (room.messages.size > MAX_ROOM_MESSAGES) {
+    const oldestMessageId = room.messages.keys().next().value;
+    if (!oldestMessageId) {
+      break;
+    }
+    room.messages.delete(oldestMessageId);
+  }
+}
+
+function storeMessage(room, messageRecord) {
+  room.messages.set(messageRecord.messageId, messageRecord);
+  trimRoomMessages(room);
 }
 
 function broadcastToRoom(roomId, payload) {
@@ -117,9 +134,64 @@ function createMessageRecord({ type, sender, content, fileName, imageDataUrl }) 
   };
 }
 
+function releaseMessagePayload(messageRecord) {
+  messageRecord.content = "";
+  messageRecord.fileName = "";
+  messageRecord.imageDataUrl = "";
+}
+
+function cleanupSocketMembership(socket) {
+  const roomId = socket.roomId;
+  const userId = socket.userId;
+
+  if (!roomId || !userId) {
+    return;
+  }
+
+  const room = rooms.get(roomId);
+  const user = room ? room.clients.get(userId) : null;
+  const nickname = user ? user.nickname : "有用户";
+
+  removeUserFromRoom(roomId, userId);
+
+  socket.roomId = null;
+  socket.userId = null;
+
+  if (rooms.has(roomId)) {
+    broadcastToRoom(roomId, {
+      type: "presence",
+      users: buildUserList(rooms.get(roomId)),
+      notice: `${nickname} 离开了房间`,
+    });
+  }
+}
+
+const heartbeatTimer = setInterval(() => {
+  for (const socket of wss.clients) {
+    if (socket.isAlive === false) {
+      socket.terminate();
+      continue;
+    }
+
+    socket.isAlive = false;
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.ping();
+    }
+  }
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on("close", () => {
+  clearInterval(heartbeatTimer);
+});
+
 wss.on("connection", (socket) => {
   let currentRoomId = null;
   let currentUserId = null;
+
+  socket.isAlive = true;
+  socket.on("pong", () => {
+    socket.isAlive = true;
+  });
 
   send(socket, {
     type: "connected",
@@ -140,6 +212,8 @@ wss.on("connection", (socket) => {
       if (currentRoomId && currentUserId) {
         const previousRoomId = currentRoomId;
         removeUserFromRoom(currentRoomId, currentUserId);
+        socket.roomId = null;
+        socket.userId = null;
         if (rooms.has(previousRoomId)) {
           broadcastToRoom(previousRoomId, {
             type: "presence",
@@ -167,6 +241,8 @@ wss.on("connection", (socket) => {
       currentRoomId = roomId;
       currentUserId = userId;
       room.clients.set(userId, { userId, nickname, socket });
+      socket.roomId = roomId;
+      socket.userId = userId;
 
       send(socket, {
         type: "joined",
@@ -218,7 +294,7 @@ wss.on("connection", (socket) => {
         sender,
         content,
       });
-      room.messages.set(messageRecord.messageId, messageRecord);
+      storeMessage(room, messageRecord);
 
       broadcastToRoom(currentRoomId, {
         type: "chat:text",
@@ -243,7 +319,7 @@ wss.on("connection", (socket) => {
       }
 
       if (imageSize > MAX_IMAGE_SIZE_BYTES) {
-        send(socket, { type: "error", message: "图片过大，请控制在 2MB 内" });
+        send(socket, { type: "error", message: "图片过大，请控制在 10MB 内" });
         return;
       }
 
@@ -253,7 +329,7 @@ wss.on("connection", (socket) => {
         fileName: fileName.slice(0, 80),
         imageDataUrl,
       });
-      room.messages.set(messageRecord.messageId, messageRecord);
+      storeMessage(room, messageRecord);
 
       broadcastToRoom(currentRoomId, {
         type: "chat:image",
@@ -289,6 +365,7 @@ wss.on("connection", (socket) => {
 
       messageRecord.recalled = true;
       messageRecord.recalledAt = Date.now();
+      releaseMessagePayload(messageRecord);
 
       broadcastToRoom(currentRoomId, {
         type: "chat:recalled",
@@ -304,23 +381,9 @@ wss.on("connection", (socket) => {
   });
 
   socket.on("close", () => {
-    if (!currentRoomId || !currentUserId) {
-      return;
-    }
-
-    const room = rooms.get(currentRoomId);
-    const user = room ? room.clients.get(currentUserId) : null;
-    const nickname = user ? user.nickname : "有用户";
-
-    removeUserFromRoom(currentRoomId, currentUserId);
-
-    if (rooms.has(currentRoomId)) {
-      broadcastToRoom(currentRoomId, {
-        type: "presence",
-        users: buildUserList(rooms.get(currentRoomId)),
-        notice: `${nickname} 离开了房间`,
-      });
-    }
+    cleanupSocketMembership(socket);
+    currentRoomId = null;
+    currentUserId = null;
   });
 });
 

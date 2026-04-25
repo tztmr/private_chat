@@ -45,6 +45,13 @@ http://localhost:3000
 
 ## Docker 部署
 
+也可以直接使用一键脚本：
+
+```bash
+chmod +x ./chatroom-oneclick.sh
+bash ./chatroom-oneclick.sh
+```
+
 ### 方式一：直接构建运行
 
 ```bash
@@ -108,7 +115,7 @@ https://chat.example.com
 
 ## 当前限制
 
-- 单张图片限制为 2MB
+- 单张图片限制为 10MB
 - 单条文字限制为 1000 字
 - 房间无密码，拿到邀请链接即可进入
 - 当前为单机部署版本，重启服务后房间状态会清空
