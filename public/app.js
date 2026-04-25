@@ -269,15 +269,16 @@ function send(payload) {
   return true;
 }
 
-function joinRoom(roomId) {
+function joinRoom(roomId, options = {}) {
   const normalizedRoomId = String(roomId || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
     .slice(0, 8);
   const password = elements.passwordInput.value.trim();
+  const { requirePassword = false } = options;
 
-  if (!password) {
-    appendMessage({ system: true, text: "请输入进入密码" });
+  if (requirePassword && !password) {
+    appendMessage({ system: true, text: "创建房间前请输入密码" });
     return;
   }
 
@@ -510,7 +511,7 @@ function recallMessage(messageId) {
 }
 
 elements.createRoomButton.addEventListener("click", () => {
-  joinRoom(randomRoomId());
+  joinRoom(randomRoomId(), { requirePassword: true });
 });
 
 elements.joinRoomButton.addEventListener("click", () => {
