@@ -253,6 +253,35 @@ nginx_conf_dir() {
   fi
 }
 
+write_nginx_proxy_conf() {
+  local conf_file="$1" domain="$2" host_port="$3"
+  local tmp_file
+  tmp_file="$(mktemp)"
+
+  cat > "$tmp_file" <<EOF
+server {
+    listen 80;
+    server_name ${domain};
+
+    location / {
+        proxy_pass http://127.0.0.1:${host_port};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+}
+EOF
+
+  run_root install -m 0644 "$tmp_file" "$conf_file"
+  rm -f "$tmp_file"
+}
+
 setup_nginx_ssl() {
   load_state || { error "未找到部署记录，请先执行部署"; return 1; }
   ensure_root_capability
@@ -267,25 +296,7 @@ setup_nginx_ssl() {
   conf_file="${conf_dir}/${domain}.conf"
 
   run_root mkdir -p "$conf_dir"
-  run_root bash -c "cat > '${conf_file}' <<EOF
-server {
-    listen 80;
-    server_name ${domain};
-
-    location / {
-        proxy_pass http://127.0.0.1:${HOST_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
-        proxy_read_timeout 600s;
-        proxy_send_timeout 600s;
-    }
-}
-EOF"
+  write_nginx_proxy_conf "$conf_file" "$domain" "$HOST_PORT"
 
   if [[ -d /etc/nginx/sites-enabled ]]; then
     run_root ln -sf "${conf_file}" "/etc/nginx/sites-enabled/${domain}.conf"
