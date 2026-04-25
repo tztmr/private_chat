@@ -9,12 +9,7 @@
   <body>
     <div class="page">
       <aside class="sidebar">
-        <div class="card">
-          <h1>匿名聊天室</h1>
-          <p class="muted">支持文字、图片、邀请链接，单房间最多 10 人。</p>
-        </div>
-
-        <div class="card">
+        <div id="nicknameCard" class="card">
           <label for="nicknameInput">你的昵称</label>
           <input id="nicknameInput" type="text" maxlength="20" placeholder="默认随机游客名" />
           <div class="button-row">
@@ -22,7 +17,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div id="roomCard" class="card">
           <label for="roomInput">房间号</label>
           <input id="roomInput" type="text" maxlength="8" placeholder="输入房间号或新建房间" />
           <div class="button-row">
@@ -31,7 +26,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div id="currentRoomCard" class="card">
           <div class="room-meta">
             <span>当前房间</span>
             <strong id="currentRoomLabel">未加入</strong>
@@ -43,7 +38,7 @@
           <p class="muted" id="statusText">正在连接服务器...</p>
         </div>
 
-        <div class="card">
+        <div id="onlineUsersCard" class="card">
           <div class="online-header">
             <span>在线成员</span>
             <strong id="onlineCount">0 / 10</strong>
@@ -84,6 +79,21 @@
         </div>
       </article>
     </template>
+
+    <div id="imageViewer" class="image-viewer" hidden>
+      <div id="imageViewerBackdrop" class="image-viewer-backdrop"></div>
+      <div class="image-viewer-panel">
+        <div class="image-viewer-toolbar">
+          <button id="zoomOutButton" class="secondary" type="button">缩小</button>
+          <button id="zoomResetButton" class="secondary" type="button">重置</button>
+          <button id="zoomInButton" class="secondary" type="button">放大</button>
+          <button id="closeViewerButton" class="secondary" type="button">关闭</button>
+        </div>
+        <div id="imageViewerStage" class="image-viewer-stage">
+          <img id="imageViewerImage" class="image-viewer-image" alt="图片预览" />
+        </div>
+      </div>
+    </div>
 
     <script src="/app.js"></script>
   </body>

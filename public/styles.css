@@ -218,6 +218,7 @@ button.secondary {
   border-radius: 12px;
   margin-top: 8px;
   display: block;
+  cursor: zoom-in;
 }
 
 .message-actions {
@@ -263,6 +264,63 @@ button.secondary {
   min-width: 120px;
 }
 
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.image-viewer[hidden] {
+  display: none;
+}
+
+.image-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 34, 0.84);
+}
+
+.image-viewer-panel {
+  position: relative;
+  z-index: 1;
+  width: min(96vw, 1100px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-viewer-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.image-viewer-stage {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  min-height: 60vh;
+  max-height: calc(92vh - 64px);
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.image-viewer-image {
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  transition: transform 0.08s linear;
+  user-select: none;
+}
+
 @media (max-width: 900px) {
   .page {
     grid-template-columns: 1fr;
@@ -292,5 +350,9 @@ button.secondary {
   .composer-actions button,
   .composer-actions .file-button {
     width: 100%;
+  }
+
+  .image-viewer-toolbar {
+    flex-wrap: wrap;
   }
 }

@@ -6,21 +6,29 @@ const state = {
   maxRoomUsers: 10,
   reconnectTimer: null,
   messages: new Map(),
+  imageViewerScale: 1,
 };
 
 const MAX_IMAGE_DATA_URL_LENGTH = 14_000_000;
 const MAX_RENDERED_MESSAGES = 200;
+const IMAGE_VIEWER_MIN_SCALE = 0.5;
+const IMAGE_VIEWER_MAX_SCALE = 5;
+const IMAGE_VIEWER_SCALE_STEP = 0.2;
 
 const elements = {
+  nicknameCard: document.getElementById("nicknameCard"),
   nicknameInput: document.getElementById("nicknameInput"),
   updateNicknameButton: document.getElementById("updateNicknameButton"),
+  roomCard: document.getElementById("roomCard"),
   roomInput: document.getElementById("roomInput"),
   createRoomButton: document.getElementById("createRoomButton"),
   joinRoomButton: document.getElementById("joinRoomButton"),
+  currentRoomCard: document.getElementById("currentRoomCard"),
   currentRoomLabel: document.getElementById("currentRoomLabel"),
   inviteLinkInput: document.getElementById("inviteLinkInput"),
   copyInviteButton: document.getElementById("copyInviteButton"),
   statusText: document.getElementById("statusText"),
+  onlineUsersCard: document.getElementById("onlineUsersCard"),
   onlineCount: document.getElementById("onlineCount"),
   userList: document.getElementById("userList"),
   messageList: document.getElementById("messageList"),
@@ -28,6 +36,14 @@ const elements = {
   imageInput: document.getElementById("imageInput"),
   sendButton: document.getElementById("sendButton"),
   messageTemplate: document.getElementById("messageTemplate"),
+  imageViewer: document.getElementById("imageViewer"),
+  imageViewerBackdrop: document.getElementById("imageViewerBackdrop"),
+  imageViewerStage: document.getElementById("imageViewerStage"),
+  imageViewerImage: document.getElementById("imageViewerImage"),
+  zoomOutButton: document.getElementById("zoomOutButton"),
+  zoomResetButton: document.getElementById("zoomResetButton"),
+  zoomInButton: document.getElementById("zoomInButton"),
+  closeViewerButton: document.getElementById("closeViewerButton"),
 };
 
 function randomRoomId() {
@@ -55,6 +71,13 @@ function escapeHtml(value) {
 
 function setStatus(message) {
   elements.statusText.textContent = message;
+}
+
+function setRoomPanelsHidden(hidden) {
+  elements.nicknameCard.hidden = hidden;
+  elements.roomCard.hidden = hidden;
+  elements.currentRoomCard.hidden = hidden;
+  elements.onlineUsersCard.hidden = hidden;
 }
 
 function updateInviteLink(roomId) {
@@ -128,6 +151,39 @@ function dataUrlToBlob(dataUrl) {
 
 function createImageObjectUrl(dataUrl) {
   return URL.createObjectURL(dataUrlToBlob(dataUrl));
+}
+
+function clampScale(scale) {
+  return Math.min(IMAGE_VIEWER_MAX_SCALE, Math.max(IMAGE_VIEWER_MIN_SCALE, scale));
+}
+
+function applyImageViewerScale() {
+  elements.imageViewerImage.style.transform = `scale(${state.imageViewerScale})`;
+}
+
+function setImageViewerScale(scale) {
+  state.imageViewerScale = clampScale(scale);
+  applyImageViewerScale();
+}
+
+function openImageViewer(sourceUrl) {
+  if (!sourceUrl) {
+    return;
+  }
+
+  elements.imageViewerImage.src = sourceUrl;
+  elements.imageViewer.hidden = false;
+  document.body.style.overflow = "hidden";
+  elements.imageViewerStage.scrollTop = 0;
+  elements.imageViewerStage.scrollLeft = 0;
+  setImageViewerScale(1);
+}
+
+function closeImageViewer() {
+  elements.imageViewer.hidden = true;
+  elements.imageViewerImage.removeAttribute("src");
+  document.body.style.overflow = "";
+  setImageViewerScale(1);
 }
 
 function appendMessage({
@@ -231,6 +287,7 @@ function handleJoined(message) {
   state.userId = message.userId;
   state.nickname = message.nickname;
   clearMessages();
+  setRoomPanelsHidden(true);
 
   elements.nicknameInput.value = message.nickname;
   elements.currentRoomLabel.textContent = message.roomId;
@@ -487,6 +544,12 @@ elements.copyInviteButton.addEventListener("click", async () => {
 elements.sendButton.addEventListener("click", sendTextMessage);
 elements.imageInput.addEventListener("change", handleImageSelection);
 elements.messageList.addEventListener("click", (event) => {
+  const image = event.target.closest(".message-body img");
+  if (image) {
+    openImageViewer(image.currentSrc || image.src);
+    return;
+  }
+
   const button = event.target.closest(".message-recall-button");
   if (!button) {
     return;
@@ -514,6 +577,37 @@ elements.messageInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
     sendTextMessage();
+  }
+});
+
+elements.imageViewerBackdrop.addEventListener("click", closeImageViewer);
+elements.closeViewerButton.addEventListener("click", closeImageViewer);
+elements.zoomInButton.addEventListener("click", () => {
+  setImageViewerScale(state.imageViewerScale + IMAGE_VIEWER_SCALE_STEP);
+});
+elements.zoomOutButton.addEventListener("click", () => {
+  setImageViewerScale(state.imageViewerScale - IMAGE_VIEWER_SCALE_STEP);
+});
+elements.zoomResetButton.addEventListener("click", () => {
+  setImageViewerScale(1);
+});
+elements.imageViewerStage.addEventListener(
+  "wheel",
+  (event) => {
+    if (elements.imageViewer.hidden) {
+      return;
+    }
+
+    event.preventDefault();
+    const delta = event.deltaY < 0 ? IMAGE_VIEWER_SCALE_STEP : -IMAGE_VIEWER_SCALE_STEP;
+    setImageViewerScale(state.imageViewerScale + delta);
+  },
+  { passive: false }
+);
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !elements.imageViewer.hidden) {
+    closeImageViewer();
   }
 });
 
