@@ -74,7 +74,7 @@ textarea {
 }
 
 textarea {
-  resize: vertical;
+  resize: none;
   min-height: 96px;
 }
 
@@ -146,6 +146,7 @@ button.secondary {
   flex-direction: column;
   min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .message-list {
@@ -259,6 +260,11 @@ button.secondary {
   padding: 16px 20px 20px;
   border-top: 1px solid #dde5ef;
   background: #ffffff;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
 .composer-actions {
