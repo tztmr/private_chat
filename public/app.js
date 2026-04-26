@@ -230,6 +230,11 @@ function getViewportHeight() {
   return window.innerHeight;
 }
 
+function updateViewportHeight() {
+  const viewportHeight = Math.max(320, Math.round(getViewportHeight()));
+  document.documentElement.style.setProperty("--app-height", `${viewportHeight}px`);
+}
+
 function setKeyboardOffset(offset) {
   state.keyboardOffset = Math.max(0, offset);
   document.documentElement.style.setProperty("--keyboard-offset", `${state.keyboardOffset}px`);
@@ -240,6 +245,8 @@ function isComposerFocused() {
 }
 
 function updateKeyboardOffset() {
+  updateViewportHeight();
+
   if (!isComposerFocused()) {
     setKeyboardOffset(0);
     return;
@@ -884,6 +891,7 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("resize", () => {
+  updateViewportHeight();
   autoResizeMessageInput();
   updateKeyboardOffset();
 });
@@ -905,6 +913,7 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+updateViewportHeight();
 autoResizeMessageInput();
 updateKeyboardOffset();
 connectSocket();
