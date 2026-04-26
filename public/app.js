@@ -7,6 +7,11 @@ const state = {
   reconnectTimer: null,
   messages: new Map(),
   imageViewerScale: 1,
+  imageViewerOffsetX: 0,
+  imageViewerOffsetY: 0,
+  imageViewerPointer: null,
+  imageViewerPinch: null,
+  keyboardOffset: 0,
 };
 
 const MAX_IMAGE_DATA_URL_LENGTH = 14_000_000;
@@ -35,6 +40,7 @@ const elements = {
   onlineCount: document.getElementById("onlineCount"),
   userList: document.getElementById("userList"),
   messageList: document.getElementById("messageList"),
+  composer: document.querySelector(".composer"),
   messageInput: document.getElementById("messageInput"),
   imageInput: document.getElementById("imageInput"),
   sendButton: document.getElementById("sendButton"),
@@ -67,9 +73,9 @@ function formatTime(timestamp) {
 
 function escapeHtml(value) {
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function setStatus(message) {
@@ -162,12 +168,30 @@ function clampScale(scale) {
   return Math.min(IMAGE_VIEWER_MAX_SCALE, Math.max(IMAGE_VIEWER_MIN_SCALE, scale));
 }
 
+function clampImageViewerOffset(value, axis) {
+  const image = elements.imageViewerImage;
+  const stage = elements.imageViewerStage;
+  const scaledImageSize =
+    (axis === "x" ? image.naturalWidth : image.naturalHeight) * state.imageViewerScale;
+  const stageSize = axis === "x" ? stage.clientWidth : stage.clientHeight;
+  const maxOffset = Math.max(0, (scaledImageSize - stageSize) / 2);
+  return Math.min(maxOffset, Math.max(-maxOffset, value));
+}
+
+function setImageViewerOffset(offsetX, offsetY) {
+  state.imageViewerOffsetX = clampImageViewerOffset(offsetX, "x");
+  state.imageViewerOffsetY = clampImageViewerOffset(offsetY, "y");
+  applyImageViewerScale();
+}
+
 function applyImageViewerScale() {
-  elements.imageViewerImage.style.transform = `scale(${state.imageViewerScale})`;
+  elements.imageViewerImage.style.transform = `translate(${state.imageViewerOffsetX}px, ${state.imageViewerOffsetY}px) scale(${state.imageViewerScale})`;
 }
 
 function setImageViewerScale(scale) {
   state.imageViewerScale = clampScale(scale);
+  state.imageViewerOffsetX = clampImageViewerOffset(state.imageViewerOffsetX, "x");
+  state.imageViewerOffsetY = clampImageViewerOffset(state.imageViewerOffsetY, "y");
   applyImageViewerScale();
 }
 
@@ -176,6 +200,10 @@ function openImageViewer(sourceUrl) {
     return;
   }
 
+  state.imageViewerOffsetX = 0;
+  state.imageViewerOffsetY = 0;
+  state.imageViewerPointer = null;
+  state.imageViewerPinch = null;
   elements.imageViewerImage.src = sourceUrl;
   elements.imageViewer.hidden = false;
   document.body.style.overflow = "hidden";
@@ -188,7 +216,123 @@ function closeImageViewer() {
   elements.imageViewer.hidden = true;
   elements.imageViewerImage.removeAttribute("src");
   document.body.style.overflow = "";
+  state.imageViewerOffsetX = 0;
+  state.imageViewerOffsetY = 0;
+  state.imageViewerPointer = null;
+  state.imageViewerPinch = null;
   setImageViewerScale(1);
+}
+
+function getViewportHeight() {
+  if (window.visualViewport && window.visualViewport.height) {
+    return window.visualViewport.height;
+  }
+  return window.innerHeight;
+}
+
+function setKeyboardOffset(offset) {
+  state.keyboardOffset = Math.max(0, offset);
+  document.documentElement.style.setProperty("--keyboard-offset", `${state.keyboardOffset}px`);
+}
+
+function isComposerFocused() {
+  return document.activeElement === elements.messageInput;
+}
+
+function updateKeyboardOffset() {
+  if (!isComposerFocused()) {
+    setKeyboardOffset(0);
+    return;
+  }
+
+  const viewport = window.visualViewport;
+  if (!viewport) {
+    setKeyboardOffset(0);
+    return;
+  }
+
+  const keyboardOffset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+  setKeyboardOffset(keyboardOffset);
+  scheduleScrollToBottom();
+}
+
+function autoResizeMessageInput() {
+  const input = elements.messageInput;
+  if (!input) {
+    return;
+  }
+
+  input.style.height = "auto";
+  const computed = window.getComputedStyle(input);
+  const lineHeight = parseFloat(computed.lineHeight) || 24;
+  const maxHeight = Math.round(lineHeight * 6);
+  const nextHeight = Math.min(maxHeight, input.scrollHeight);
+  input.style.height = `${Math.max(nextHeight, 96)}px`;
+  input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
+}
+
+function getTouchDistance(firstTouch, secondTouch) {
+  const deltaX = secondTouch.clientX - firstTouch.clientX;
+  const deltaY = secondTouch.clientY - firstTouch.clientY;
+  return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+}
+
+function getTouchCenter(firstTouch, secondTouch) {
+  return {
+    x: (firstTouch.clientX + secondTouch.clientX) / 2,
+    y: (firstTouch.clientY + secondTouch.clientY) / 2,
+  };
+}
+
+function beginImageViewerDrag(clientX, clientY) {
+  state.imageViewerPointer = {
+    clientX,
+    clientY,
+    offsetX: state.imageViewerOffsetX,
+    offsetY: state.imageViewerOffsetY,
+  };
+}
+
+function updateImageViewerDrag(clientX, clientY) {
+  if (!state.imageViewerPointer) {
+    return;
+  }
+
+  const deltaX = clientX - state.imageViewerPointer.clientX;
+  const deltaY = clientY - state.imageViewerPointer.clientY;
+  setImageViewerOffset(state.imageViewerPointer.offsetX + deltaX, state.imageViewerPointer.offsetY + deltaY);
+}
+
+function endImageViewerDrag() {
+  state.imageViewerPointer = null;
+}
+
+function beginImageViewerPinch(firstTouch, secondTouch) {
+  const center = getTouchCenter(firstTouch, secondTouch);
+  state.imageViewerPinch = {
+    distance: getTouchDistance(firstTouch, secondTouch),
+    centerX: center.x,
+    centerY: center.y,
+    scale: state.imageViewerScale,
+  };
+}
+
+function updateImageViewerPinch(firstTouch, secondTouch) {
+  if (!state.imageViewerPinch) {
+    return;
+  }
+
+  const distance = getTouchDistance(firstTouch, secondTouch);
+  if (!distance) {
+    return;
+  }
+
+  const nextScale = (distance / state.imageViewerPinch.distance) * state.imageViewerPinch.scale;
+  setImageViewerScale(nextScale);
+}
+
+function endImageViewerPinch() {
+  state.imageViewerPinch = null;
 }
 
 function scrollMessageListToBottom() {
@@ -515,6 +659,8 @@ function sendTextMessage() {
 
   if (isSent) {
     elements.messageInput.value = "";
+    autoResizeMessageInput();
+    scheduleScrollToBottom();
   }
 }
 
@@ -588,7 +734,8 @@ elements.messageList.addEventListener("click", (event) => {
 });
 
 elements.messageInput.addEventListener("paste", async (event) => {
-  const items = Array.from(event.clipboardData?.items || []);
+  const clipboardData = event.clipboardData;
+  const items = Array.from((clipboardData && clipboardData.items) || []);
   const imageItem = items.find((item) => item.type.startsWith("image/"));
   if (!imageItem) {
     return;
@@ -599,6 +746,21 @@ elements.messageInput.addEventListener("paste", async (event) => {
   if (file) {
     await sendImageFile(file);
   }
+});
+
+elements.messageInput.addEventListener("input", () => {
+  autoResizeMessageInput();
+  updateKeyboardOffset();
+});
+
+elements.messageInput.addEventListener("focus", () => {
+  autoResizeMessageInput();
+  updateKeyboardOffset();
+  setTimeout(updateKeyboardOffset, 250);
+});
+
+elements.messageInput.addEventListener("blur", () => {
+  setTimeout(updateKeyboardOffset, 50);
 });
 
 elements.messageInput.addEventListener("keydown", (event) => {
@@ -633,11 +795,103 @@ elements.imageViewerStage.addEventListener(
   { passive: false }
 );
 
+elements.imageViewerStage.addEventListener("mousedown", (event) => {
+  if (elements.imageViewer.hidden || event.button !== 0) {
+    return;
+  }
+
+  event.preventDefault();
+  beginImageViewerDrag(event.clientX, event.clientY);
+});
+
+elements.imageViewerStage.addEventListener(
+  "touchstart",
+  (event) => {
+    if (elements.imageViewer.hidden) {
+      return;
+    }
+
+    if (event.touches.length >= 2) {
+      beginImageViewerPinch(event.touches[0], event.touches[1]);
+      endImageViewerDrag();
+      return;
+    }
+
+    if (event.touches.length === 1) {
+      beginImageViewerDrag(event.touches[0].clientX, event.touches[0].clientY);
+    }
+  },
+  { passive: true }
+);
+
+elements.imageViewerStage.addEventListener(
+  "touchmove",
+  (event) => {
+    if (elements.imageViewer.hidden) {
+      return;
+    }
+
+    if (event.touches.length >= 2) {
+      event.preventDefault();
+      updateImageViewerPinch(event.touches[0], event.touches[1]);
+      return;
+    }
+
+    if (event.touches.length === 1 && state.imageViewerPointer) {
+      event.preventDefault();
+      updateImageViewerDrag(event.touches[0].clientX, event.touches[0].clientY);
+    }
+  },
+  { passive: false }
+);
+
+elements.imageViewerStage.addEventListener("touchend", (event) => {
+  if (event.touches.length >= 2) {
+    beginImageViewerPinch(event.touches[0], event.touches[1]);
+    return;
+  }
+
+  endImageViewerPinch();
+  if (event.touches.length === 1) {
+    beginImageViewerDrag(event.touches[0].clientX, event.touches[0].clientY);
+    return;
+  }
+
+  endImageViewerDrag();
+});
+
+elements.imageViewerStage.addEventListener("touchcancel", () => {
+  endImageViewerPinch();
+  endImageViewerDrag();
+});
+
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !elements.imageViewer.hidden) {
     closeImageViewer();
   }
 });
+
+window.addEventListener("mousemove", (event) => {
+  if (!state.imageViewerPointer || elements.imageViewer.hidden) {
+    return;
+  }
+
+  updateImageViewerDrag(event.clientX, event.clientY);
+});
+
+window.addEventListener("mouseup", () => {
+  endImageViewerDrag();
+});
+
+window.addEventListener("resize", () => {
+  autoResizeMessageInput();
+  updateKeyboardOffset();
+});
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", updateKeyboardOffset);
+  window.visualViewport.addEventListener("scroll", updateKeyboardOffset);
+}
 
 window.addEventListener("beforeunload", () => {
   if (state.reconnectTimer) {
@@ -651,4 +905,6 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+autoResizeMessageInput();
+updateKeyboardOffset();
 connectSocket();

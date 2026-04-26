@@ -2,14 +2,26 @@
   box-sizing: border-box;
 }
 
+:root {
+  --keyboard-offset: 0px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f3f5f9;
   color: #18202a;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -20,6 +32,7 @@ textarea {
 
 .page {
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   height: 100vh;
   height: 100dvh;
   display: grid;
@@ -31,7 +44,7 @@ textarea {
 }
 
 .sidebar {
-  padding: 16px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   background: #0f1722;
   color: #f8fbff;
   display: flex;
@@ -75,11 +88,16 @@ textarea {
   padding: 12px 14px;
   background: #ffffff;
   color: #18202a;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 textarea {
-  resize: vertical;
+  resize: none;
   min-height: 96px;
+  max-height: 144px;
+  overflow-y: hidden;
 }
 
 .composer-tip {
@@ -157,6 +175,7 @@ button.secondary {
   min-height: 0;
   padding: 20px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -260,9 +279,12 @@ button.secondary {
 }
 
 .composer {
-  padding: 16px 20px 20px;
+  padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
   border-top: 1px solid #dde5ef;
   background: #ffffff;
+  transform: translateY(calc(var(--keyboard-offset) * -1));
+  transition: transform 0.2s ease;
+  will-change: transform;
 }
 
 .composer-actions {
@@ -317,11 +339,13 @@ button.secondary {
   border-radius: 16px;
   min-height: 60vh;
   max-height: calc(92vh - 64px);
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  touch-action: none;
+  cursor: grab;
 }
 
 .image-viewer-image {
@@ -330,6 +354,12 @@ button.secondary {
   transform-origin: center center;
   transition: transform 0.08s linear;
   user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.image-viewer-stage:active {
+  cursor: grabbing;
 }
 
 @media (max-width: 900px) {
@@ -351,6 +381,10 @@ button.secondary {
   .composer,
   .message-list {
     padding: 14px;
+  }
+
+  .composer {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
 
   .button-row,
