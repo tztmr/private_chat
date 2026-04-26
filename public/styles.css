@@ -1,3 +1,10 @@
+ :root {
+  --app-height: 100vh;
+  --composer-height: 180px;
+  --viewport-offset-bottom: 0px;
+  --sidebar-width: 320px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,8 +14,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f3f5f9;
   color: #18202a;
-  height: 100vh;
-  height: 100dvh;
+  height: var(--app-height);
   overflow: hidden;
 }
 
@@ -19,9 +25,8 @@ textarea {
 }
 
 .page {
-  min-height: 100vh;
-  height: 100vh;
-  height: 100dvh;
+  min-height: var(--app-height);
+  height: var(--app-height);
   display: grid;
   grid-template-columns: 320px 1fr;
 }
@@ -142,6 +147,7 @@ button.secondary {
 }
 
 .chat-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -153,6 +159,7 @@ button.secondary {
   flex: 1;
   min-height: 0;
   padding: 20px;
+  padding-bottom: calc(20px + var(--composer-height));
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -260,11 +267,14 @@ button.secondary {
   padding: 16px 20px 20px;
   border-top: 1px solid #dde5ef;
   background: #ffffff;
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  position: fixed;
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: var(--viewport-offset-bottom);
+  z-index: 20;
   flex-shrink: 0;
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 24px rgba(15, 23, 34, 0.08);
 }
 
 .composer-actions {
@@ -339,6 +349,10 @@ button.secondary {
     grid-template-columns: 1fr;
   }
 
+  .composer {
+    left: 0;
+  }
+
   .chat-panel {
     min-height: 0;
   }
@@ -350,9 +364,12 @@ button.secondary {
 
 @media (max-width: 520px) {
   .sidebar,
-  .composer,
   .message-list {
     padding: 14px;
+  }
+
+  .composer {
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
   }
 
   .button-row,

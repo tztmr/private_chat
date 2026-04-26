@@ -16,6 +16,7 @@ const IMAGE_VIEWER_MAX_SCALE = 5;
 const IMAGE_VIEWER_SCALE_STEP = 0.2;
 
 const elements = {
+  root: document.documentElement,
   nicknameCard: document.getElementById("nicknameCard"),
   nicknameInput: document.getElementById("nicknameInput"),
   updateNicknameButton: document.getElementById("updateNicknameButton"),
@@ -33,6 +34,7 @@ const elements = {
   onlineCount: document.getElementById("onlineCount"),
   userList: document.getElementById("userList"),
   messageList: document.getElementById("messageList"),
+  composer: document.getElementById("composer"),
   messageInput: document.getElementById("messageInput"),
   imageInput: document.getElementById("imageInput"),
   sendButton: document.getElementById("sendButton"),
@@ -72,6 +74,31 @@ function escapeHtml(value) {
 
 function setStatus(message) {
   elements.statusText.textContent = message;
+}
+
+function setRootCssVar(name, value) {
+  elements.root.style.setProperty(name, value);
+}
+
+function updateComposerMetrics() {
+  if (!elements.composer) {
+    return;
+  }
+
+  const composerHeight = Math.ceil(elements.composer.getBoundingClientRect().height);
+  setRootCssVar("--composer-height", `${composerHeight}px`);
+}
+
+function updateViewportMetrics() {
+  const visualViewport = window.visualViewport;
+  const viewportHeight = visualViewport ? Math.round(visualViewport.height) : window.innerHeight;
+  const viewportBottomOffset = visualViewport
+    ? Math.max(0, Math.round(window.innerHeight - visualViewport.height - visualViewport.offsetTop))
+    : 0;
+
+  setRootCssVar("--app-height", `${viewportHeight}px`);
+  setRootCssVar("--viewport-offset-bottom", `${viewportBottomOffset}px`);
+  updateComposerMetrics();
 }
 
 function setRoomPanelsHidden(hidden) {
@@ -604,6 +631,15 @@ elements.messageInput.addEventListener("keydown", (event) => {
   }
 });
 
+elements.messageInput.addEventListener("focus", () => {
+  updateViewportMetrics();
+  setTimeout(updateViewportMetrics, 250);
+});
+
+elements.messageInput.addEventListener("blur", () => {
+  setTimeout(updateViewportMetrics, 250);
+});
+
 elements.imageViewerBackdrop.addEventListener("click", closeImageViewer);
 elements.closeViewerButton.addEventListener("click", closeImageViewer);
 elements.zoomInButton.addEventListener("click", () => {
@@ -635,6 +671,16 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+window.addEventListener("resize", updateViewportMetrics);
+window.addEventListener("orientationchange", () => {
+  setTimeout(updateViewportMetrics, 250);
+});
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", updateViewportMetrics);
+  window.visualViewport.addEventListener("scroll", updateViewportMetrics);
+}
+
 window.addEventListener("beforeunload", () => {
   if (state.reconnectTimer) {
     clearTimeout(state.reconnectTimer);
@@ -647,4 +693,5 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+updateViewportMetrics();
 connectSocket();
