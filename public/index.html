@@ -7,8 +7,8 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="page">
-      <aside class="sidebar">
+    <div id="pageRoot" class="page">
+      <aside id="sidebar" class="sidebar">
         <div id="nicknameCard" class="card">
           <label for="nicknameInput">你的昵称</label>
           <input id="nicknameInput" type="text" maxlength="20" placeholder="默认随机游客名" />
@@ -52,7 +52,7 @@
       <main class="chat-panel">
         <section id="messageList" class="message-list" aria-live="polite"></section>
 
-        <section id="composer" class="composer">
+        <section class="composer">
           <textarea
             id="messageInput"
             rows="3"
