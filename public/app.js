@@ -187,6 +187,19 @@ function closeImageViewer() {
   setImageViewerScale(1);
 }
 
+function scrollMessageListToBottom() {
+  elements.messageList.scrollTop = elements.messageList.scrollHeight;
+  const lastMessage = elements.messageList.lastElementChild;
+  if (lastMessage) {
+    lastMessage.scrollIntoView({ block: "end" });
+  }
+}
+
+function scheduleScrollToBottom() {
+  scrollMessageListToBottom();
+  requestAnimationFrame(scrollMessageListToBottom);
+}
+
 function appendMessage({
   messageId = "",
   nickname,
@@ -220,6 +233,8 @@ function appendMessage({
     image.src = imageObjectUrl;
     image.alt = "聊天图片";
     image.loading = "lazy";
+    image.addEventListener("load", scheduleScrollToBottom, { once: true });
+    image.addEventListener("error", scheduleScrollToBottom, { once: true });
     body.appendChild(image);
   }
 
@@ -240,7 +255,7 @@ function appendMessage({
 
   elements.messageList.appendChild(node);
   trimRenderedMessages();
-  elements.messageList.scrollTop = elements.messageList.scrollHeight;
+  scheduleScrollToBottom();
 }
 
 function markMessageRecalled(messageId) {
