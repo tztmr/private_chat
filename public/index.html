@@ -19,7 +19,7 @@
 
         <div id="roomCard" class="card">
           <label for="passwordInput">创建房间密码</label>
-          <input id="passwordInput" type="password" maxlength="50" placeholder="仅创建新房间时需要输入 dx888" />
+          <input id="passwordInput" type="password" maxlength="50" placeholder="请输入密码" />
           <label for="roomInput">房间号</label>
           <input id="roomInput" type="text" maxlength="8" placeholder="输入房间号或新建房间" />
           <div class="button-row">
@@ -51,9 +51,9 @@
 
       <main class="chat-panel">
         <section id="pinnedNotice" class="pinned-notice" hidden>
-          <strong>进房提醒</strong>
-          <p>进房间后，准备好了请回复数字“1”</p>
-          <p>客服让发几的时候就点拍照上传对应的二维码，不要擅自乱发</p>
+          <strong>置顶消息</strong>
+          <p>进房间后 准备好了请回复数字"1"谢谢</p>
+          <p>客服让发几的就拍照发几的二维码 不要擅自乱发</p>
         </section>
         <section id="messageList" class="message-list" aria-live="polite"></section>
 
@@ -76,11 +76,13 @@
 
     <template id="messageTemplate">
       <article class="message">
+        <strong class="message-author"></strong>
+        <div class="message-bubble">
+          <div class="message-body"></div>
+        </div>
         <div class="message-header">
-          <strong class="message-author"></strong>
           <span class="message-time"></span>
         </div>
-        <div class="message-body"></div>
         <div class="message-actions">
           <button class="message-recall-button" type="button">撤回</button>
         </div>
