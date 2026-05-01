@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-const ROOM_ACCESS_PASSWORD = process.env.ROOM_ACCESS_PASSWORD || "dx888";
+const ROOM_ACCESS_PASSWORD = process.env.ROOM_ACCESS_PASSWORD || "dx333";
 const MAX_ROOM_USERS = 10;
 const MAX_TEXT_LENGTH = 1000;
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
