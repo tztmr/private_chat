@@ -211,6 +211,33 @@ wss.on("connection", (socket) => {
 
     if (message.type === "join") {
       const providedPassword = String(message.password || "").trim();
+      const requestedRoomId = String(message.roomId || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .slice(0, ROOM_ID_LENGTH);
+      const roomId = requestedRoomId || randomId(ROOM_ID_LENGTH);
+      const roomExists = rooms.has(roomId);
+      const targetRoom = roomExists ? rooms.get(roomId) : null;
+      const isRejoiningCurrentRoom =
+        Boolean(currentRoomId) &&
+        currentRoomId === roomId &&
+        Boolean(currentUserId) &&
+        Boolean(targetRoom) &&
+        targetRoom.clients.has(currentUserId);
+
+      if (!roomExists && providedPassword !== ROOM_ACCESS_PASSWORD) {
+        send(socket, { type: "error", message: "密码错误，无法创建房间" });
+        return;
+      }
+
+      const activeClientCount = targetRoom
+        ? targetRoom.clients.size - (isRejoiningCurrentRoom ? 1 : 0)
+        : 0;
+      if (activeClientCount >= MAX_ROOM_USERS) {
+        send(socket, { type: "error", message: "房间已满，最多 10 人" });
+        return;
+      }
+
       if (currentRoomId && currentUserId) {
         const previousRoomId = currentRoomId;
         removeUserFromRoom(currentRoomId, currentUserId);
@@ -225,23 +252,7 @@ wss.on("connection", (socket) => {
         }
       }
 
-      const requestedRoomId = String(message.roomId || "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .slice(0, ROOM_ID_LENGTH);
-      const roomId = requestedRoomId || randomId(ROOM_ID_LENGTH);
-      const roomExists = rooms.has(roomId);
-
-      if (!roomExists && providedPassword !== ROOM_ACCESS_PASSWORD) {
-        send(socket, { type: "error", message: "密码错误，无法创建房间" });
-        return;
-      }
-
       const room = createRoomIfMissing(roomId);
-      if (room.clients.size >= MAX_ROOM_USERS) {
-        send(socket, { type: "error", message: "房间已满，最多 10 人" });
-        return;
-      }
 
       const userId = randomId(USER_ID_LENGTH);
       const nickname = normalizeNickname(message.nickname);
