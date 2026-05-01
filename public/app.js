@@ -15,7 +15,9 @@ const state = {
   pendingImagePreviews: [],
 };
 
-const MAX_IMAGE_DATA_URL_LENGTH = 14_000_000;
+const TARGET_IMAGE_UPLOAD_BYTES = 450 * 1024;
+const MAX_IMAGE_DIMENSION = 1280;
+const MIN_IMAGE_QUALITY = 0.5;
 const MAX_RENDERED_MESSAGES = 200;
 const IMAGE_VIEWER_MIN_SCALE = 0.5;
 const IMAGE_VIEWER_MAX_SCALE = 5;
@@ -284,9 +286,10 @@ function autoResizeMessageInput() {
   input.style.height = "auto";
   const computed = window.getComputedStyle(input);
   const lineHeight = parseFloat(computed.lineHeight) || 24;
-  const maxHeight = Math.round(lineHeight * 6);
+  const minHeight = 80;
+  const maxHeight = Math.round(lineHeight * 5);
   const nextHeight = Math.min(maxHeight, input.scrollHeight);
-  input.style.height = `${Math.max(nextHeight, 96)}px`;
+  input.style.height = `${Math.max(nextHeight, minHeight)}px`;
   input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
@@ -599,12 +602,33 @@ function readImageAsDataUrl(file) {
   });
 }
 
+function readBlobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("图片转换失败"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function loadImage(dataUrl) {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error("图片解析失败"));
     image.src = dataUrl;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("图片压缩失败"));
+        return;
+      }
+      resolve(blob);
+    }, type, quality);
   });
 }
 
@@ -628,9 +652,11 @@ async function compressImage(file) {
 
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("浏览器不支持图片压缩");
+  }
   let { width, height } = image;
-  const maxDimension = 1600;
-  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(width, height));
 
   width = Math.max(1, Math.round(width * scale));
   height = Math.max(1, Math.round(height * scale));
@@ -638,12 +664,13 @@ async function compressImage(file) {
   canvas.height = height;
   context.drawImage(image, 0, 0, width, height);
 
-  let quality = 0.9;
-  let imageDataUrl = canvas.toDataURL("image/jpeg", quality);
-  while (imageDataUrl.length > MAX_IMAGE_DATA_URL_LENGTH && quality > 0.45) {
-    quality -= 0.1;
-    imageDataUrl = canvas.toDataURL("image/jpeg", quality);
+  let quality = 0.82;
+  let imageBlob = await canvasToBlob(canvas, "image/jpeg", quality);
+  while (imageBlob.size > TARGET_IMAGE_UPLOAD_BYTES && quality > MIN_IMAGE_QUALITY) {
+    quality -= 0.08;
+    imageBlob = await canvasToBlob(canvas, "image/jpeg", quality);
   }
+  const imageDataUrl = await readBlobAsDataUrl(imageBlob);
 
   return {
     fileName: file.name.replace(/\.[^.]+$/, "") + ".jpg",

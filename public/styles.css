@@ -92,15 +92,9 @@ textarea {
 
 textarea {
   resize: none;
-  min-height: 96px;
-  max-height: 144px;
+  min-height: 80px;
+  max-height: 128px;
   overflow-y: hidden;
-}
-
-.composer-tip {
-  margin: 10px 0 0;
-  color: #66788a;
-  font-size: 13px;
 }
 
 .button-row,

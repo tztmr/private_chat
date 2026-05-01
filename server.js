@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 const ROOM_ACCESS_PASSWORD = process.env.ROOM_ACCESS_PASSWORD || "dx333";
 const MAX_ROOM_USERS = 10;
 const MAX_TEXT_LENGTH = 1000;
-const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
 const MAX_ROOM_MESSAGES = 100;
 const ROOM_ID_LENGTH = 8;
 const USER_ID_LENGTH = 10;
@@ -365,7 +365,7 @@ wss.on("connection", (socket) => {
       }
 
       if (imageSize > MAX_IMAGE_SIZE_BYTES) {
-        send(socket, { type: "error", message: "图片过大，请控制在 10MB 内" });
+        send(socket, { type: "error", message: "图片过大，请控制在 2MB 内" });
         return;
       }
 
