@@ -12,6 +12,7 @@ const state = {
   imageViewerPointer: null,
   imageViewerPinch: null,
   keyboardOffset: 0,
+  pendingImagePreviews: [],
 };
 
 const MAX_IMAGE_DATA_URL_LENGTH = 14_000_000;
@@ -372,14 +373,18 @@ function appendMessage({
   timestamp,
   text,
   imageDataUrl,
+  imageUrl = "",
   system = false,
   self = false,
+  pending = false,
 }) {
   const node = elements.messageTemplate.content.firstElementChild.cloneNode(true);
   const author = node.querySelector(".message-author");
   const time = node.querySelector(".message-time");
   const body = node.querySelector(".message-body");
+  const bubble = node.querySelector(".message-bubble");
   const recallButton = node.querySelector(".message-recall-button");
+  const isImageOnly = Boolean((imageDataUrl || imageUrl) && !text);
   node.imageObjectUrls = [];
 
   author.textContent = system ? "系统消息" : nickname;
@@ -392,16 +397,22 @@ function appendMessage({
     body.appendChild(paragraph);
   }
 
-  if (imageDataUrl) {
+  if (imageDataUrl || imageUrl) {
     const image = document.createElement("img");
-    const imageObjectUrl = createImageObjectUrl(imageDataUrl);
-    node.imageObjectUrls.push(imageObjectUrl);
-    image.src = imageObjectUrl;
+    const resolvedImageUrl = imageUrl || createImageObjectUrl(imageDataUrl);
+    if (resolvedImageUrl.startsWith("blob:")) {
+      node.imageObjectUrls.push(resolvedImageUrl);
+    }
+    image.src = resolvedImageUrl;
     image.alt = "聊天图片";
-    image.loading = "lazy";
     image.addEventListener("load", scheduleScrollToBottom, { once: true });
     image.addEventListener("error", scheduleScrollToBottom, { once: true });
     body.appendChild(image);
+  }
+
+  if (isImageOnly) {
+    bubble.classList.add("image-only");
+    body.classList.add("image-only");
   }
 
   if (system) {
@@ -418,6 +429,11 @@ function appendMessage({
     recallButton.hidden = true;
   }
 
+  if (pending) {
+    node.classList.add("pending-image");
+    recallButton.hidden = true;
+  }
+
   if (messageId) {
     state.messages.set(messageId, node);
   }
@@ -425,6 +441,7 @@ function appendMessage({
   elements.messageList.appendChild(node);
   trimRenderedMessages();
   scheduleScrollToBottom();
+  return node;
 }
 
 function appendHistoryMessage(message) {
@@ -437,9 +454,7 @@ function appendHistoryMessage(message) {
         ? "这条消息已被撤回"
         : message.type === "chat:text"
           ? message.content
-          : message.fileName
-            ? `发送了图片：${message.fileName}`
-            : "发送了一张图片",
+          : "",
     imageDataUrl: message.recalled || message.type !== "chat:image" ? "" : message.imageDataUrl,
     self: message.userId === state.userId,
   });
@@ -468,12 +483,68 @@ function markMessageRecalled(messageId) {
 
   const node = messageEntry;
   const body = node.querySelector(".message-body");
+  const bubble = node.querySelector(".message-bubble");
   const recallButton = node.querySelector(".message-recall-button");
   revokeNodeImageUrls(node);
+  bubble.classList.remove("image-only");
+  body.classList.remove("image-only");
   body.innerHTML = `<p>${escapeHtml("这条消息已被撤回")}</p>`;
   node.classList.add("recalled");
   recallButton.hidden = true;
   state.messages.delete(messageId);
+}
+
+function getNextPendingImagePreview() {
+  while (state.pendingImagePreviews.length > 0) {
+    const previewNode = state.pendingImagePreviews.shift();
+    if (previewNode && previewNode.isConnected) {
+      return previewNode;
+    }
+  }
+
+  return null;
+}
+
+function addPendingImagePreview(file) {
+  const previewUrl = URL.createObjectURL(file);
+  const previewNode = appendMessage({
+    nickname: state.nickname || "我",
+    timestamp: Date.now(),
+    imageUrl: previewUrl,
+    self: true,
+    pending: true,
+  });
+  state.pendingImagePreviews.push(previewNode);
+  return previewNode;
+}
+
+function adoptPendingImagePreview(message) {
+  const previewNode = getNextPendingImagePreview();
+  if (!previewNode) {
+    return false;
+  }
+
+  const time = previewNode.querySelector(".message-time");
+  const recallButton = previewNode.querySelector(".message-recall-button");
+  previewNode.classList.remove("pending-image");
+  previewNode.dataset.messageId = message.messageId || "";
+  time.textContent = formatTime(message.timestamp || Date.now());
+
+  if (message.messageId) {
+    state.messages.set(message.messageId, previewNode);
+  }
+
+  recallButton.hidden = false;
+  scheduleScrollToBottom();
+  return true;
+}
+
+function removePendingImagePreview(previewNode) {
+  if (!previewNode) {
+    return;
+  }
+
+  removeMessageNode(previewNode);
 }
 
 function send(payload) {
@@ -538,15 +609,23 @@ function loadImage(dataUrl) {
 }
 
 async function compressImage(file) {
-  const sourceDataUrl = await readImageAsDataUrl(file);
   if (file.type === "image/gif" || file.type === "image/svg+xml") {
+    const sourceDataUrl = await readImageAsDataUrl(file);
     return {
       fileName: file.name,
       imageDataUrl: sourceDataUrl,
     };
   }
 
-  const image = await loadImage(sourceDataUrl);
+  const sourceUrl = URL.createObjectURL(file);
+  let image;
+
+  try {
+    image = await loadImage(sourceUrl);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   let { width, height } = image;
@@ -578,8 +657,9 @@ async function sendImageFile(file) {
     return;
   }
 
+  const previewNode = addPendingImagePreview(file);
+
   try {
-    appendMessage({ system: true, text: `正在处理图片：${file.name}` });
     const { fileName, imageDataUrl } = await compressImage(file);
     const isSent = send({
       type: "chat:image",
@@ -587,10 +667,11 @@ async function sendImageFile(file) {
       imageDataUrl,
     });
 
-    if (isSent) {
-      appendMessage({ system: true, text: `图片 ${fileName} 已发送` });
+    if (!isSent) {
+      removePendingImagePreview(previewNode);
     }
   } catch (error) {
+    removePendingImagePreview(previewNode);
     appendMessage({ system: true, text: error.message || "发送图片失败" });
   }
 }
@@ -651,11 +732,14 @@ function handleSocketMessage(event) {
   }
 
   if (message.type === "chat:image") {
+    if (message.userId === state.userId && adoptPendingImagePreview(message)) {
+      return;
+    }
+
     appendMessage({
       messageId: message.messageId,
       nickname: message.nickname,
       timestamp: message.timestamp,
-      text: message.fileName ? `发送了图片：${message.fileName}` : "发送了一张图片",
       imageDataUrl: message.imageDataUrl,
       self: message.userId === state.userId,
     });
