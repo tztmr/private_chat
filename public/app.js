@@ -19,6 +19,7 @@ const MAX_RENDERED_MESSAGES = 200;
 const IMAGE_VIEWER_MIN_SCALE = 0.5;
 const IMAGE_VIEWER_MAX_SCALE = 5;
 const IMAGE_VIEWER_SCALE_STEP = 0.2;
+const SYSTEM_MESSAGE_LIFETIME_MS = 10_000;
 
 const elements = {
   pageRoot: document.getElementById("pageRoot"),
@@ -39,6 +40,7 @@ const elements = {
   onlineUsersCard: document.getElementById("onlineUsersCard"),
   onlineCount: document.getElementById("onlineCount"),
   userList: document.getElementById("userList"),
+  pinnedNotice: document.getElementById("pinnedNotice"),
   messageList: document.getElementById("messageList"),
   composer: document.querySelector(".composer"),
   messageInput: document.getElementById("messageInput"),
@@ -91,6 +93,10 @@ function setRoomPanelsHidden(hidden) {
   elements.onlineUsersCard.hidden = hidden;
 }
 
+function setPinnedNoticeVisible(visible) {
+  elements.pinnedNotice.hidden = !visible;
+}
+
 function updateInviteLink(roomId) {
   if (!roomId) {
     elements.inviteLinkInput.value = "";
@@ -123,6 +129,11 @@ function revokeNodeImageUrls(node) {
 function removeMessageNode(node) {
   if (!node) {
     return;
+  }
+
+  if (node.removeTimer) {
+    clearTimeout(node.removeTimer);
+    node.removeTimer = null;
   }
 
   revokeNodeImageUrls(node);
@@ -396,6 +407,9 @@ function appendMessage({
   if (system) {
     node.classList.add("system");
     recallButton.hidden = true;
+    node.removeTimer = setTimeout(() => {
+      removeMessageNode(node);
+    }, SYSTEM_MESSAGE_LIFETIME_MS);
   } else if (self) {
     node.classList.add("self");
     recallButton.hidden = false;
@@ -411,6 +425,39 @@ function appendMessage({
   elements.messageList.appendChild(node);
   trimRenderedMessages();
   scheduleScrollToBottom();
+}
+
+function appendHistoryMessage(message) {
+  appendMessage({
+    messageId: message.messageId,
+    nickname: message.nickname,
+    timestamp: message.timestamp,
+    text:
+      message.recalled
+        ? "这条消息已被撤回"
+        : message.type === "chat:text"
+          ? message.content
+          : message.fileName
+            ? `发送了图片：${message.fileName}`
+            : "发送了一张图片",
+    imageDataUrl: message.recalled || message.type !== "chat:image" ? "" : message.imageDataUrl,
+    self: message.userId === state.userId,
+  });
+
+  if (!message.recalled) {
+    return;
+  }
+
+  const node = state.messages.get(message.messageId);
+  if (!node) {
+    return;
+  }
+
+  node.classList.add("recalled");
+  const recallButton = node.querySelector(".message-recall-button");
+  if (recallButton) {
+    recallButton.hidden = true;
+  }
 }
 
 function markMessageRecalled(messageId) {
@@ -467,11 +514,13 @@ function handleJoined(message) {
   state.nickname = message.nickname;
   clearMessages();
   setRoomPanelsHidden(true);
+  setPinnedNoticeVisible(true);
 
   elements.nicknameInput.value = message.nickname;
   elements.currentRoomLabel.textContent = message.roomId;
   updateInviteLink(message.roomId);
   renderUsers(message.users);
+  (message.messages || []).forEach(appendHistoryMessage);
   setStatus(`已进入房间 ${message.roomId}`);
   appendMessage({ system: true, text: `已成功进入房间 ${message.roomId}` });
 }
@@ -645,6 +694,7 @@ function connectSocket() {
 
   socket.addEventListener("close", () => {
     setStatus("连接已断开，3 秒后重连");
+    setPinnedNoticeVisible(Boolean(state.roomId));
     state.reconnectTimer = setTimeout(connectSocket, 3000);
   });
 

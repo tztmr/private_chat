@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
-const ROOM_ACCESS_PASSWORD = process.env.ROOM_ACCESS_PASSWORD || "mxw888";
+const ROOM_ACCESS_PASSWORD = process.env.ROOM_ACCESS_PASSWORD || "dx888";
 const MAX_ROOM_USERS = 10;
 const MAX_TEXT_LENGTH = 1000;
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -46,6 +46,7 @@ function createRoomIfMissing(roomId) {
     rooms.set(roomId, {
       clients: new Map(),
       messages: new Map(),
+      creatorUserId: "",
     });
   }
 
@@ -55,6 +56,11 @@ function createRoomIfMissing(roomId) {
 function removeUserFromRoom(roomId, userId) {
   const room = rooms.get(roomId);
   if (!room) {
+    return;
+  }
+
+  if (room.creatorUserId === userId) {
+    rooms.delete(roomId);
     return;
   }
 
@@ -86,6 +92,21 @@ function storeMessage(room, messageRecord) {
   trimRoomMessages(room);
 }
 
+function buildMessageHistory(roomId, room) {
+  return Array.from(room.messages.values()).map((messageRecord) => ({
+    type: messageRecord.type,
+    messageId: messageRecord.messageId,
+    roomId,
+    userId: messageRecord.senderUserId,
+    nickname: messageRecord.senderNickname,
+    content: messageRecord.content,
+    fileName: messageRecord.fileName,
+    imageDataUrl: messageRecord.imageDataUrl,
+    timestamp: messageRecord.timestamp,
+    recalled: Boolean(messageRecord.recalled),
+  }));
+}
+
 function broadcastToRoom(roomId, payload) {
   const room = rooms.get(roomId);
   if (!room) {
@@ -106,9 +127,9 @@ function send(socket, payload) {
   }
 }
 
-function normalizeNickname(rawNickname) {
+function normalizeNickname(rawNickname, fallbackNickname = "") {
   const trimmed = String(rawNickname || "").trim().slice(0, 20);
-  return trimmed || `游客${randomId(GUEST_NAME_LENGTH)}`;
+  return trimmed || fallbackNickname || `游客${randomId(GUEST_NAME_LENGTH)}`;
 }
 
 function parseImageSize(dataUrl) {
@@ -255,7 +276,12 @@ wss.on("connection", (socket) => {
       const room = createRoomIfMissing(roomId);
 
       const userId = randomId(USER_ID_LENGTH);
-      const nickname = normalizeNickname(message.nickname);
+      const defaultNickname = roomExists ? "" : "扫码客服";
+      const nickname = normalizeNickname(message.nickname, defaultNickname);
+
+      if (!roomExists) {
+        room.creatorUserId = userId;
+      }
 
       currentRoomId = roomId;
       currentUserId = userId;
@@ -269,6 +295,7 @@ wss.on("connection", (socket) => {
         userId,
         nickname,
         users: buildUserList(room),
+        messages: buildMessageHistory(roomId, room),
       });
 
       broadcastToRoom(roomId, {

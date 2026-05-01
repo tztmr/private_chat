@@ -168,6 +168,32 @@ button.secondary {
   overflow: hidden;
 }
 
+.pinned-notice {
+  margin: 14px 20px 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff7d6;
+  border: 1px solid #f0dc8b;
+  color: #5a4300;
+  box-shadow: 0 4px 14px rgba(90, 67, 0, 0.08);
+}
+
+.pinned-notice strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.pinned-notice p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pinned-notice p + p {
+  margin-top: 4px;
+}
+
 .message-list {
   flex: 1;
   min-height: 0;
@@ -195,18 +221,21 @@ button.secondary {
 
 .message.self {
   align-self: flex-end;
-  background: #2a7fff;
-  border-color: #2a7fff;
-  color: #ffffff;
+  background: #e6f2ff;
+  border-color: #bfdcff;
+  color: #16324f;
 }
 
 .message.self .message-time,
 .message.self .message-author {
-  color: #ffffff;
+  color: #43617f;
 }
 
 .message.other {
   align-self: flex-start;
+  background: #fff0f5;
+  border-color: #f4c8d7;
+  color: #4d2735;
 }
 
 .message.recalled {
@@ -379,8 +408,57 @@ button.secondary {
     padding: 14px;
   }
 
+  .pinned-notice {
+    margin: 10px 14px 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .pinned-notice strong,
+  .pinned-notice p {
+    font-size: 13px;
+  }
+
   .composer {
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .message-list {
+    gap: 10px;
+  }
+
+  .message {
+    max-width: min(88vw, 320px);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+
+  .message-header {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .message-author {
+    font-size: 13px;
+  }
+
+  .message-time {
+    font-size: 11px;
+  }
+
+  .message-body {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .message-body img {
+    max-width: min(100%, 220px);
+    border-radius: 10px;
+    margin-top: 6px;
+  }
+
+  .message-actions {
+    margin-top: 8px;
   }
 
   .button-row,
