@@ -111,6 +111,10 @@ textarea {
   margin-top: 12px;
 }
 
+.composer-actions {
+  align-items: center;
+}
+
 button,
 .file-button {
   border: none;
@@ -520,6 +524,7 @@ button.secondary {
 
   .composer-actions {
     flex-direction: row;
+    align-items: stretch;
     gap: 10px;
   }
 
