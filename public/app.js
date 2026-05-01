@@ -378,6 +378,7 @@ function appendMessage({
   imageDataUrl,
   imageUrl = "",
   system = false,
+  temporary = false,
   self = false,
   pending = false,
 }) {
@@ -421,9 +422,11 @@ function appendMessage({
   if (system) {
     node.classList.add("system");
     recallButton.hidden = true;
-    node.removeTimer = setTimeout(() => {
-      removeMessageNode(node);
-    }, SYSTEM_MESSAGE_LIFETIME_MS);
+    if (temporary) {
+      node.removeTimer = setTimeout(() => {
+        removeMessageNode(node);
+      }, SYSTEM_MESSAGE_LIFETIME_MS);
+    }
   } else if (self) {
     node.classList.add("self");
     recallButton.hidden = false;
@@ -552,7 +555,7 @@ function removePendingImagePreview(previewNode) {
 
 function send(payload) {
   if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
-    appendMessage({ system: true, text: "连接尚未建立，请稍后重试" });
+    appendMessage({ system: true, temporary: true, text: "连接尚未建立，请稍后重试" });
     return false;
   }
 
@@ -590,7 +593,7 @@ function handleJoined(message) {
   renderUsers(message.users);
   (message.messages || []).forEach(appendHistoryMessage);
   setStatus(`已进入房间 ${message.roomId}`);
-  appendMessage({ system: true, text: `已成功进入房间 ${message.roomId}` });
+  appendMessage({ system: true, temporary: true, text: `已成功进入房间 ${message.roomId}` });
 }
 
 function readImageAsDataUrl(file) {
@@ -680,7 +683,7 @@ async function compressImage(file) {
 
 async function sendImageFile(file) {
   if (!file || !file.type.startsWith("image/")) {
-    appendMessage({ system: true, text: "只能发送图片文件" });
+    appendMessage({ system: true, temporary: true, text: "只能发送图片文件" });
     return;
   }
 
@@ -699,7 +702,7 @@ async function sendImageFile(file) {
     }
   } catch (error) {
     removePendingImagePreview(previewNode);
-    appendMessage({ system: true, text: error.message || "发送图片失败" });
+    appendMessage({ system: true, temporary: true, text: error.message || "发送图片失败" });
   }
 }
 
@@ -715,6 +718,7 @@ function handleRecalledMessage(message) {
   markMessageRecalled(message.messageId);
   appendMessage({
     system: true,
+    temporary: true,
     text: message.userId === state.userId ? "你撤回了一条消息" : `${message.nickname} 撤回了一条消息`,
     timestamp: message.timestamp,
   });
@@ -742,7 +746,7 @@ function handleSocketMessage(event) {
   if (message.type === "presence") {
     renderUsers(message.users || []);
     if (message.notice) {
-      appendMessage({ system: true, text: message.notice });
+      appendMessage({ system: true, temporary: false, text: message.notice });
     }
     return;
   }
@@ -779,7 +783,7 @@ function handleSocketMessage(event) {
   }
 
   if (message.type === "error") {
-    appendMessage({ system: true, text: message.message || "发生未知错误" });
+    appendMessage({ system: true, temporary: true, text: message.message || "发生未知错误" });
   }
 }
 
@@ -848,7 +852,7 @@ elements.joinRoomButton.addEventListener("click", () => {
 elements.updateNicknameButton.addEventListener("click", () => {
   const nickname = elements.nicknameInput.value.trim();
   if (!nickname) {
-    appendMessage({ system: true, text: "昵称不能为空" });
+    appendMessage({ system: true, temporary: true, text: "昵称不能为空" });
     return;
   }
 
@@ -865,15 +869,15 @@ elements.updateNicknameButton.addEventListener("click", () => {
 elements.copyInviteButton.addEventListener("click", async () => {
   const value = elements.inviteLinkInput.value;
   if (!value) {
-    appendMessage({ system: true, text: "请先进入房间再复制链接" });
+    appendMessage({ system: true, temporary: true, text: "请先进入房间再复制链接" });
     return;
   }
 
   try {
     await navigator.clipboard.writeText(value);
-    appendMessage({ system: true, text: "邀请链接已复制" });
+    appendMessage({ system: true, temporary: true, text: "邀请链接已复制" });
   } catch (error) {
-    appendMessage({ system: true, text: "复制失败，请手动复制" });
+    appendMessage({ system: true, temporary: true, text: "复制失败，请手动复制" });
   }
 });
 
