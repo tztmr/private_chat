@@ -158,6 +158,7 @@ function trimRenderedMessages() {
 function clearMessages() {
   Array.from(elements.messageList.children).forEach(removeMessageNode);
   state.messages.clear();
+  state.pendingImagePreviews = [];
 }
 
 function dataUrlToBlob(dataUrl) {
@@ -524,6 +525,10 @@ function addPendingImagePreview(file) {
   return previewNode;
 }
 
+function discardPendingImagePreview(previewNode) {
+  state.pendingImagePreviews = state.pendingImagePreviews.filter((node) => node !== previewNode);
+}
+
 function adoptPendingImagePreview(message) {
   const previewNode = getNextPendingImagePreview();
   if (!previewNode) {
@@ -550,6 +555,7 @@ function removePendingImagePreview(previewNode) {
     return;
   }
 
+  discardPendingImagePreview(previewNode);
   removeMessageNode(previewNode);
 }
 
