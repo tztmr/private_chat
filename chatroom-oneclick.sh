@@ -353,6 +353,17 @@ nginx_conf_dir() {
   fi
 }
 
+enable_nginx_conf_if_needed() {
+  local conf_file="$1"
+  if [[ "$conf_file" == /etc/nginx/conf.d/* ]]; then
+    run_root rm -f "/etc/nginx/sites-enabled/$(basename "$conf_file")" 2>/dev/null || true
+    return 0
+  fi
+  if [[ -d /etc/nginx/sites-enabled ]]; then
+    run_root ln -sf "$conf_file" "/etc/nginx/sites-enabled/$(basename "$conf_file")"
+  fi
+}
+
 write_nginx_http_conf() {
   local conf_file="$1" domain="$2" app_bind_port="$3"
   local tmp_file
@@ -556,10 +567,7 @@ setup_https() {
 
   run_root mkdir -p "$conf_dir"
   write_nginx_http_conf "$conf_file" "$DOMAIN" "$APP_BIND_PORT"
-
-  if [[ -d /etc/nginx/sites-enabled ]]; then
-    run_root ln -sf "$conf_file" "/etc/nginx/sites-enabled/${DOMAIN}.conf"
-  fi
+  enable_nginx_conf_if_needed "$conf_file"
 
   allow_firewall_port 80
   allow_firewall_port 443
