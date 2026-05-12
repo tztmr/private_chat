@@ -52,11 +52,20 @@ chmod +x ./chatroom-oneclick.sh
 bash ./chatroom-oneclick.sh
 ```
 
+脚本现在支持自动拉代码：
+
+- 可以只把 `chatroom-oneclick.sh` 上传到服务器执行
+- 首次部署时会提示输入 Git 仓库地址、分支和安装目录
+- 脚本会自动把代码拉到服务器，再执行 Docker 部署
+
+脚本默认会把应用绑定到 `127.0.0.1:3001`，不会直接占用 `80/443`。
+如果服务器上已经有别的网站在用 `443`，请继续复用那一套 Nginx/网关，只把当前域名反向代理到 `127.0.0.1:3001`。
+
 ### 方式一：直接构建运行
 
 ```bash
 docker build -t anonymous-chatroom .
-docker run -d --name anonymous-chatroom -p 3000:3000 anonymous-chatroom
+docker run -d --name anonymous-chatroom -p 127.0.0.1:3001:3000 anonymous-chatroom
 ```
 
 ### 方式二：使用 Docker Compose
@@ -65,13 +74,29 @@ docker run -d --name anonymous-chatroom -p 3000:3000 anonymous-chatroom
 docker compose up -d --build
 ```
 
+当前默认端口映射：
+
+```text
+127.0.0.1:3001 -> 容器 3000
+```
+
+这表示应用只接受来自本机反向代理的流量，适合和同机其他站点共享 `443`。
+
 启动后访问：
 
 ```text
-http://服务器IP:3000
+http://127.0.0.1:3001
 ```
 
 ## Nginx + 域名 + HTTPS/WSS 部署
+
+推荐方案：
+
+- Docker 容器只监听 `127.0.0.1:3001`
+- 整台服务器只保留一个 Nginx 占用 `443`
+- Nginx 按域名把 `chat.example.com` 转发到 `127.0.0.1:3001`
+
+这样同一台服务器可以同时跑多个 HTTPS 站点，不会发生多个服务抢占 `443` 的冲突。
 
 ### 1. 域名解析
 
@@ -79,12 +104,13 @@ http://服务器IP:3000
 
 ### 2. 启动 Node 服务
 
-- 建议先用 Docker 或 `pm2` 启动本项目，监听 `3000` 端口
+- 建议先用 Docker 启动本项目，并仅绑定本机端口 `127.0.0.1:3001`
 
 ### 3. 复制 Nginx 配置
 
 - 参考文件：`deploy/nginx/chatroom.conf.example`
 - 将其中的 `chat.example.com` 替换成你的真实域名
+- 如果服务器已有统一网关，只需要把当前域名的 upstream 改为 `http://127.0.0.1:3001`
 
 ### 4. 签发 HTTPS 证书
 
@@ -111,6 +137,8 @@ https://chat.example.com
 
 - 页面通过 `https` 打开后，前端会自动使用 `wss://当前域名` 建立 WebSocket
 - Nginx 配置里已经包含 WebSocket 升级头，支持 `WSS`
+- 如果 `443` 已经被宝塔、面板 Nginx、Caddy、Traefik 或其他网关占用，不要再启动第二个占 `443` 的服务
+- 正确做法是继续复用现有 `443` 入口，只新增一个域名转发规则到 `127.0.0.1:3001`
 - 如果你放在 CDN 或反向代理后面，需要确保它们也允许 WebSocket 透传
 
 ## 当前限制

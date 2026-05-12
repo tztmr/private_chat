@@ -18,7 +18,7 @@ server {
   client_max_body_size 5m;
 
   location / {
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:3001;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -30,3 +30,8 @@ server {
     proxy_send_timeout 600s;
   }
 }
+
+# 说明：
+# - 聊天室 Docker 容器只建议绑定到 127.0.0.1:3001 这类本机高位端口
+# - 整台服务器只保留一个 Nginx 占用 443，然后按 server_name 把不同域名转发到不同本机端口
+# - 这样同一台服务器可同时部署多个 HTTPS 站点，不会出现多个服务争抢 443 的问题
